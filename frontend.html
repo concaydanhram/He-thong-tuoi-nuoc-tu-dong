@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bộ điều khiển IoT</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        @import url("https://cdnjs.cloudflare.com/ajax/libs/meyer-reset/2.0/reset.min.css");
+        * { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+        body { margin: 0; padding: 0; height: 100vh; width: 100vw; font-family: "Montserrat", sans-serif; background-color: #dfdfdf; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow-x: hidden; }
+        header h1 { font-weight: 700; font-size: clamp(24px, 4vw, 40px); margin-bottom: 20px; color: #000; text-align: center; }
+        .card { background-color: #efefef; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 95%; max-width: 1250px; padding: 30px; display: flex; flex-direction: column; gap: 30px; }
+        .monitor-section { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; }
+        .gauge-group { flex: 1; min-width: 280px; display: flex; flex-direction: column; align-items: center; position: relative; }
+        .gauge-title { font-size: 24px; font-weight: 500; margin-bottom: 15px; }
+        .gauge-visual { width: 200px; height: 200px; position: relative; display: flex; align-items: center; justify-content: center; }
+        .gauge-svg { position: absolute; width: 100%; height: 100%; transform: rotate(-90deg); }
+        .gauge-track { fill: none; stroke: #D9D9D9; stroke-width: 20; }
+        .gauge-fill { fill: none; stroke: #4CAF50; stroke-width: 20; stroke-dasharray: 502.65; stroke-dashoffset: 502.65; transition: stroke-dashoffset 0.5s ease-out; }
+        .gauge-fill.water { stroke: #2196F3; }
+        .gauge-value { position: absolute; font-size: 40px; font-weight: 700; z-index: 2; }
+        .controls-center { display: flex; flex-direction: column; gap: 20px; align-items: center; min-width: 120px; }
+        .btn-control { width: 90px; height: 90px; border-radius: 50%; border: 4px solid white; font-weight: bold; color: white; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.2); transition: transform 0.1s, background 0.3s; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+        .btn-control:active { transform: scale(0.95); }
+        .off { background: linear-gradient(0deg, #FF0000, #ff4d4d); }
+        .on { background: linear-gradient(0deg, #00c80d, #00FF11); }
+        .slider-section { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 40px; margin-top: 20px; }
+        .slider-group { flex: 1; min-width: 300px; background: #d9d9d980; padding: 20px; border-radius: 15px; position: relative; }
+        .slider-header { display: flex; justify-content: space-between; margin-bottom: 10px; font-weight: 500; font-size: 18px; }
+        input[type=range] { width: 100%; height: 15px; -webkit-appearance: none; background: #fff; border-radius: 50px; outline: none; cursor: pointer; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 30px; height: 30px; background: #000; border-radius: 50%; cursor: pointer; box-shadow: 0 0 5px rgba(0,0,0,0.3); }
+        @media (max-width: 768px) { body { height: auto; padding: 20px 0; } .monitor-section { flex-direction: column; } .slider-section { flex-direction: column; gap: 20px; } .controls-center { flex-direction: row; } }
+    </style>
+</head>
+<body>
+    <header><h1>Bộ điều khiển</h1></header>
+
+    <div class="card">
+        <div class="monitor-section">
+            <div class="gauge-group">
+                <div class="gauge-title">Độ ẩm</div>
+                <div class="gauge-visual">
+                    <svg viewBox="0 0 200 200" class="gauge-svg">
+                        <circle cx="100" cy="100" r="80" class="gauge-track"/>
+                        <circle cx="100" cy="100" r="80" class="gauge-fill" id="mois-circle-fill"/>
+                    </svg>
+                    <span class="gauge-value" id="disp-mois">--</span> 
+                </div>
+            </div>
+
+            <div class="controls-center">
+                <button id="btn-auto" class="btn-control off">AUTO</button>
+                <button id="btn-pump" class="btn-control off">PUMP</button>
+            </div>
+
+            <div class="gauge-group">
+                <div class="gauge-title">Mực nước</div>
+                <div class="gauge-visual">
+                    <svg viewBox="0 0 200 200" class="gauge-svg">
+                        <circle cx="100" cy="100" r="80" class="gauge-track"/>
+                        <circle cx="100" cy="100" r="80" class="gauge-fill water" id="water-circle-fill"/>
+                    </svg>
+                    <span class="gauge-value" id="disp-water">--</span>
+                </div>
+            </div>
+        </div>
+        <div class="slider-section">
+            <div class="slider-group">
+                <div class="slider-header"><label>Ngưỡng độ ẩm</label><span id="val-mois">0</span></div>
+                <input type="range" id="sl-mois" min="0" max="100" value="0">
+            </div>
+            <div class="slider-group">
+                <div class="slider-header"><label>Ngưỡng mực nước</label><span id="val-water">0</span></div>
+                <input type="range" id="sl-water" min="0" max="100" value="0">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const CIRCUMFERENCE = 502.65;
+        // --- ĐỊA CHỈ IP TĨNH ĐÃ CÀI TRONG ESP32 ---
+        const BASE = "http://vuonthongminh.local"; 
+        
+        let autoState = 0;
+        let pumpState = 0;
+
+        const updateCircleGauge = (id, value) => {
+            const circle = document.getElementById(id);
+            const v = Math.min(100, Math.max(0, value));
+            const offset = CIRCUMFERENCE * (1 - v / 100);
+            circle.style.strokeDashoffset = offset;
+        };
+
+        const updateDisplayValue = (id, value) => {
+            document.getElementById(id).textContent = value;
+        };
+
+        const setBtnState = (btn, on) => {
+            btn.classList.toggle('on', on);
+            btn.classList.toggle('off', !on);
+        };
+
+        // --- KHỞI CHẠY HỆ THỐNG ---
+        const setupSlider = (sliderId, valueId, endpoint) => {
+            const slider = document.getElementById(sliderId);
+            const display = document.getElementById(valueId);
+            // Dùng event 'change' để chỉ gửi khi thả tay (tối ưu ESP32)
+            slider.addEventListener("change", function () { 
+                display.textContent = this.value;
+                fetch(`${BASE}${endpoint}?val=${this.value}`);
+            });
+            // Dùng event 'input' để cập nhật số hiển thị mượt mà
+            slider.addEventListener("input", function() {
+                display.textContent = this.value;
+            });
+        };
+
+        const toggleAuto = () => {
+            autoState = autoState ? 0 : 1;
+            if (autoState === 1) {
+                pumpState = 0;
+                setBtnState(document.getElementById("btn-pump"), false);
+            }
+            setBtnState(document.getElementById("btn-auto"), autoState === 1);
+            fetch(`${BASE}/toggle/auto?state=${autoState}`);
+        };
+
+        const togglePump = () => {
+            pumpState = pumpState ? 0 : 1;
+            if (pumpState === 1) {
+                autoState = 0;
+                setBtnState(document.getElementById("btn-auto"), false);
+            }
+            setBtnState(document.getElementById("btn-pump"), pumpState === 1);
+            fetch(`${BASE}/toggle/pump?state=${pumpState}`);
+        };
+
+        const fetchDataAndRefreshGauges = async () => {
+            try {
+                const res = await fetch(`${BASE}/data`);
+                const data = await res.json();
+                updateDisplayValue("disp-mois", data.mois);
+                updateCircleGauge("mois-circle-fill", data.mois);
+                updateDisplayValue("disp-water", data.water);
+                updateCircleGauge("water-circle-fill", data.water);
+            } catch (err) { console.log("Lỗi kết nối:", err); }
+        };
+
+        const syncUI = async () => {
+            try {
+                const res = await fetch(`${BASE}/state`);
+                const st = await res.json();
+                
+                autoState = st.auto;
+                setBtnState(document.getElementById("btn-auto"), autoState === 1);
+                
+                pumpState = st.pump;
+                setBtnState(document.getElementById("btn-pump"), pumpState === 1);
+                
+                document.getElementById("sl-mois").value = st.moisThres;
+                document.getElementById("val-mois").textContent = st.moisThres;
+                
+                document.getElementById("sl-water").value = st.levThres;
+                document.getElementById("val-water").textContent = st.levThres;
+            } catch (err) { console.log("Lỗi đồng bộ:", err); }
+        };
+
+        // --- SETUP ---
+        setupSlider("sl-mois", "val-mois", "/set/mois");
+        setupSlider("sl-water", "val-water", "/set/water");
+
+        document.getElementById("btn-auto").onclick = toggleAuto;
+        document.getElementById("btn-pump").onclick = togglePump;
+
+        fetchDataAndRefreshGauges();
+        syncUI();
+        setInterval(fetchDataAndRefreshGauges, 5000);
+        setInterval(syncUI, 5000);
+    </script>
+</body>
+</html>
