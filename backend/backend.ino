@@ -5,9 +5,10 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <BlynkSimpleEsp32.h>
+#include <ESPmDNS.h>
 
-char ssid[] = "415B9";
-char pass[] = "10anhdeptrai";
+char ssid[] = "PhamQuangTrung";
+char pass[] = "h4ymwyx6";
 
 int soilSen = 35;
 int waterSen = 34;
@@ -183,6 +184,10 @@ void setup() {
 
   Serial.print("[SYSTEM] IP: ");
   Serial.println(WiFi.localIP());
+
+  if (MDNS.begin("vuonthongminh")) {
+    Serial.println("MDNS responder started");
+  }
 
   Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
 

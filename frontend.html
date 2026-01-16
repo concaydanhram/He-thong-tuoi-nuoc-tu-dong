@@ -106,12 +106,10 @@
         const setupSlider = (sliderId, valueId, endpoint) => {
             const slider = document.getElementById(sliderId);
             const display = document.getElementById(valueId);
-            // Dùng event 'change' để chỉ gửi khi thả tay (tối ưu ESP32)
             slider.addEventListener("change", function () { 
                 display.textContent = this.value;
                 fetch(`${BASE}${endpoint}?val=${this.value}`);
             });
-            // Dùng event 'input' để cập nhật số hiển thị mượt mà
             slider.addEventListener("input", function() {
                 display.textContent = this.value;
             });
