@@ -99,6 +99,7 @@ void apiSetMoisture() {
   int pct = server.arg("val").toInt();
   moiThreshold = 4095 - (pct / 100.0 * 4095);
 
+  Blynk.virtualWrite(V2, pct);
   Serial.print("[API] New Moisture Threshold RAW = ");
   Serial.println(moiThreshold);
 
@@ -114,6 +115,7 @@ void apiSetWater() {
   int pct = server.arg("val").toInt();
   levThreshold = (pct / 100.0 * 4095);
 
+  Blynk.virtualWrite(V3, pct);
   Serial.print("[API] New Water Threshold RAW = ");
   Serial.println(levThreshold);
 
@@ -147,6 +149,25 @@ void apiTogglePump() {
     Serial.println(manualPumpState);
   }
   server.send(200, "text/plain", "OK");
+}
+
+void apiState() {
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  int moisThresPct = 0;
+  if (moiThreshold > 0) {
+      moisThresPct = 100 - (int)(moiThreshold / 4095.0 * 100);
+  }
+
+  int levThresPct = (int)(levThreshold / 4095.0 * 100);
+
+  String json = "{";
+  json += "\"auto\":" + String(autoModeEnabled) + ",";
+  json += "\"pump\":" + String(manualPumpState) + ","; 
+  json += "\"moisThres\":" + String(moisThresPct) + ","; 
+  json += "\"levThres\":" + String(levThresPct);
+  json += "}";
+
+  server.send(200, "application/json", json);
 }
 
 unsigned long lastDebug = 0;
@@ -194,6 +215,7 @@ void setup() {
   timer.setInterval(1000L, sendMoisture);
   timer.setInterval(1000L, sendLevel);
 
+  server.on("/state", apiState);
   server.on("/data", apiData);
   server.on("/set/mois", apiSetMoisture);
   server.on("/set/water", apiSetWater);

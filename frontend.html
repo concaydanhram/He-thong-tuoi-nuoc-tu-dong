@@ -80,7 +80,6 @@
 
     <script>
         const CIRCUMFERENCE = 502.65;
-        // --- ĐỊA CHỈ IP TĨNH ĐÃ CÀI TRONG ESP32 ---
         const BASE = "http://vuonthongminh.local"; 
         
         let autoState = 0;
@@ -174,8 +173,8 @@
 
         fetchDataAndRefreshGauges();
         syncUI();
-        setInterval(fetchDataAndRefreshGauges, 5000);
-        setInterval(syncUI, 5000);
+        setInterval(fetchDataAndRefreshGauges, 5000); //udate every 5 seconds
+        setInterval(syncUI, 5000); //sync every 5 seconds
     </script>
 </body>
 </html>
