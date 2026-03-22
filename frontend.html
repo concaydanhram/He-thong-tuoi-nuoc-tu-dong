@@ -1,180 +1,338 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bộ điều khiển IoT</title>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&display=swap" rel="stylesheet">
-    
-    <style>
-        @import url("https://cdnjs.cloudflare.com/ajax/libs/meyer-reset/2.0/reset.min.css");
-        * { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
-        body { margin: 0; padding: 0; height: 100vh; width: 100vw; font-family: "Montserrat", sans-serif; background-color: #dfdfdf; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow-x: hidden; }
-        header h1 { font-weight: 700; font-size: clamp(24px, 4vw, 40px); margin-bottom: 20px; color: #000; text-align: center; }
-        .card { background-color: #efefef; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 95%; max-width: 1250px; padding: 30px; display: flex; flex-direction: column; gap: 30px; }
-        .monitor-section { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; }
-        .gauge-group { flex: 1; min-width: 280px; display: flex; flex-direction: column; align-items: center; position: relative; }
-        .gauge-title { font-size: 24px; font-weight: 500; margin-bottom: 15px; }
-        .gauge-visual { width: 200px; height: 200px; position: relative; display: flex; align-items: center; justify-content: center; }
-        .gauge-svg { position: absolute; width: 100%; height: 100%; transform: rotate(-90deg); }
-        .gauge-track { fill: none; stroke: #D9D9D9; stroke-width: 20; }
-        .gauge-fill { fill: none; stroke: #4CAF50; stroke-width: 20; stroke-dasharray: 502.65; stroke-dashoffset: 502.65; transition: stroke-dashoffset 0.5s ease-out; }
-        .gauge-fill.water { stroke: #2196F3; }
-        .gauge-value { position: absolute; font-size: 40px; font-weight: 700; z-index: 2; }
-        .controls-center { display: flex; flex-direction: column; gap: 20px; align-items: center; min-width: 120px; }
-        .btn-control { width: 90px; height: 90px; border-radius: 50%; border: 4px solid white; font-weight: bold; color: white; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.2); transition: transform 0.1s, background 0.3s; display: flex; align-items: center; justify-content: center; font-size: 14px; }
-        .btn-control:active { transform: scale(0.95); }
-        .off { background: linear-gradient(0deg, #FF0000, #ff4d4d); }
-        .on { background: linear-gradient(0deg, #00c80d, #00FF11); }
-        .slider-section { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 40px; margin-top: 20px; }
-        .slider-group { flex: 1; min-width: 300px; background: #d9d9d980; padding: 20px; border-radius: 15px; position: relative; }
-        .slider-header { display: flex; justify-content: space-between; margin-bottom: 10px; font-weight: 500; font-size: 18px; }
-        input[type=range] { width: 100%; height: 15px; -webkit-appearance: none; background: #fff; border-radius: 50px; outline: none; cursor: pointer; }
-        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 30px; height: 30px; background: #000; border-radius: 50%; cursor: pointer; box-shadow: 0 0 5px rgba(0,0,0,0.3); }
-        @media (max-width: 768px) { body { height: auto; padding: 20px 0; } .monitor-section { flex-direction: column; } .slider-section { flex-direction: column; gap: 20px; } .controls-center { flex-direction: row; } }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bộ điều khiển IoT</title>
+
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: sans-serif;
+    background: #dfdfdf;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+}
+
+header h1 {
+    font-size: clamp(24px, 4vw, 40px);
+    margin-bottom: 20px;
+}
+
+.card {
+    background: #efefef;
+    border-radius: 20px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    width: 95%;
+    max-width: 1200px;
+    padding: 25px;
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+}
+
+.monitor-section {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.gauge-group {
+    flex: 1;
+    min-width: 250px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.gauge-title {
+    margin-bottom: 10px;
+    font-size: 18px;
+}
+
+.gauge-visual {
+    width: 180px;
+    height: 180px;
+    position: relative;
+}
+
+.gauge-svg {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+}
+
+.gauge-track {
+    fill: none;
+    stroke: #ccc;
+    stroke-width: 18;
+}
+
+.gauge-fill {
+    fill: none;
+    stroke: #4CAF50;
+    stroke-width: 18;
+    stroke-dasharray: 502;
+    stroke-dashoffset: 502;
+    transition: stroke-dashoffset 0.4s ease;
+}
+
+.gauge-fill.water {
+    stroke: #2196F3;
+}
+
+.gauge-value {
+    position: absolute;
+    font-size: 32px;
+    font-weight: bold;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.controls-center {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.btn {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: none;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.off { background: red; }
+.on  { background: green; }
+
+.slider-section {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.slider-group {
+    flex: 1;
+    min-width: 250px;
+    background: #ddd;
+    padding: 15px;
+    border-radius: 10px;
+}
+
+.slider-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+input[type=range] {
+    width: 100%;
+}
+
+@media (max-width: 768px) {
+    .monitor-section {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .controls-center {
+        justify-content: center;
+    }
+}
+</style>
 </head>
+
 <body>
-    <header><h1>Bộ điều khiển</h1></header>
 
-    <div class="card">
-        <div class="monitor-section">
-            <div class="gauge-group">
-                <div class="gauge-title">Độ ẩm</div>
-                <div class="gauge-visual">
-                    <svg viewBox="0 0 200 200" class="gauge-svg">
-                        <circle cx="100" cy="100" r="80" class="gauge-track"/>
-                        <circle cx="100" cy="100" r="80" class="gauge-fill" id="mois-circle-fill"/>
-                    </svg>
-                    <span class="gauge-value" id="disp-mois">--</span> 
-                </div>
-            </div>
+<header>
+    <h1>Bộ điều khiển</h1>
+</header>
 
-            <div class="controls-center">
-                <button id="btn-auto" class="btn-control off">AUTO</button>
-                <button id="btn-pump" class="btn-control off">PUMP</button>
-            </div>
+<div class="card">
 
-            <div class="gauge-group">
-                <div class="gauge-title">Mực nước</div>
-                <div class="gauge-visual">
-                    <svg viewBox="0 0 200 200" class="gauge-svg">
-                        <circle cx="100" cy="100" r="80" class="gauge-track"/>
-                        <circle cx="100" cy="100" r="80" class="gauge-fill water" id="water-circle-fill"/>
-                    </svg>
-                    <span class="gauge-value" id="disp-water">--</span>
-                </div>
+    <!-- ===== GAUGE ===== -->
+    <div class="monitor-section">
+
+        <div class="gauge-group">
+            <div class="gauge-title">Độ ẩm</div>
+            <div class="gauge-visual">
+                <svg viewBox="0 0 200 200" class="gauge-svg">
+                    <circle cx="100" cy="100" r="80" class="gauge-track"/>
+                    <circle cx="100" cy="100" r="80" class="gauge-fill" id="mois-fill"/>
+                </svg>
+                <div class="gauge-value" id="mois-val">--</div>
             </div>
         </div>
-        <div class="slider-section">
-            <div class="slider-group">
-                <div class="slider-header"><label>Ngưỡng độ ẩm</label><span id="val-mois">0</span></div>
-                <input type="range" id="sl-mois" min="0" max="100" value="0">
-            </div>
-            <div class="slider-group">
-                <div class="slider-header"><label>Ngưỡng mực nước</label><span id="val-water">0</span></div>
-                <input type="range" id="sl-water" min="0" max="100" value="0">
+
+        <div class="controls-center">
+            <button id="btn-auto" class="btn off">AUTO</button>
+            <button id="btn-pump" class="btn off">PUMP</button>
+        </div>
+
+        <div class="gauge-group">
+            <div class="gauge-title">Mực nước</div>
+            <div class="gauge-visual">
+                <svg viewBox="0 0 200 200" class="gauge-svg">
+                    <circle cx="100" cy="100" r="80" class="gauge-track"/>
+                    <circle cx="100" cy="100" r="80" class="gauge-fill water" id="water-fill"/>
+                </svg>
+                <div class="gauge-value" id="water-val">--</div>
             </div>
         </div>
+
     </div>
 
-    <script>
-        const CIRCUMFERENCE = 502.65;
-        const BASE = "http://vuonthongminh.local"; 
-        
-        let autoState = 0;
-        let pumpState = 0;
+    <!-- ===== SLIDER ===== -->
+    <div class="slider-section">
 
-        const updateCircleGauge = (id, value) => {
-            const circle = document.getElementById(id);
-            const v = Math.min(100, Math.max(0, value));
-            const offset = CIRCUMFERENCE * (1 - v / 100);
-            circle.style.strokeDashoffset = offset;
-        };
+        <div class="slider-group">
+            <div class="slider-header">
+                <span>Ngưỡng độ ẩm</span>
+                <span id="val-mois">0</span>
+            </div>
+            <input type="range" id="sl-mois" min="0" max="100">
+        </div>
 
-        const updateDisplayValue = (id, value) => {
-            document.getElementById(id).textContent = value;
-        };
+        <div class="slider-group">
+            <div class="slider-header">
+                <span>Ngưỡng mực nước</span>
+                <span id="val-water">0</span>
+            </div>
+            <input type="range" id="sl-water" min="0" max="100">
+        </div>
 
-        const setBtnState = (btn, on) => {
-            btn.classList.toggle('on', on);
-            btn.classList.toggle('off', !on);
-        };
+    </div>
 
-        // --- KHỞI CHẠY HỆ THỐNG ---
-        const setupSlider = (sliderId, valueId, endpoint) => {
-            const slider = document.getElementById(sliderId);
-            const display = document.getElementById(valueId);
-            slider.addEventListener("change", function () { 
-                display.textContent = this.value;
-                fetch(`${BASE}${endpoint}?val=${this.value}`);
-            });
-            slider.addEventListener("input", function() {
-                display.textContent = this.value;
-            });
-        };
+</div>
 
-        const toggleAuto = () => {
-            autoState = autoState ? 0 : 1;
-            if (autoState === 1) {
-                pumpState = 0;
-                setBtnState(document.getElementById("btn-pump"), false);
-            }
-            setBtnState(document.getElementById("btn-auto"), autoState === 1);
-            fetch(`${BASE}/toggle/auto?state=${autoState}`);
-        };
+<script>
+//CONFIG
+const BASE = "http://vuonthongminh.local";
+const MAX = 100;
+const CIRC = 502.65;
+const INTERVAL = 5000;
 
-        const togglePump = () => {
-            pumpState = pumpState ? 0 : 1;
-            if (pumpState === 1) {
-                autoState = 0;
-                setBtnState(document.getElementById("btn-auto"), false);
-            }
-            setBtnState(document.getElementById("btn-pump"), pumpState === 1);
-            fetch(`${BASE}/toggle/pump?state=${pumpState}`);
-        };
+//STATE
+let state = {
+    auto: 0,
+    pump: 0
+};
 
-        const fetchDataAndRefreshGauges = async () => {
-            try {
-                const res = await fetch(`${BASE}/data`);
-                const data = await res.json();
-                updateDisplayValue("disp-mois", data.mois);
-                updateCircleGauge("mois-circle-fill", data.mois);
-                updateDisplayValue("disp-water", data.water);
-                updateCircleGauge("water-circle-fill", data.water);
-            } catch (err) { console.log("Lỗi kết nối:", err); }
-        };
+//DOM
+const $ = id => document.getElementById(id);
 
-        const syncUI = async () => {
-            try {
-                const res = await fetch(`${BASE}/state`);
-                const st = await res.json();
-                
-                autoState = st.auto;
-                setBtnState(document.getElementById("btn-auto"), autoState === 1);
-                
-                pumpState = st.pump;
-                setBtnState(document.getElementById("btn-pump"), pumpState === 1);
-                
-                document.getElementById("sl-mois").value = st.moisThres;
-                document.getElementById("val-mois").textContent = st.moisThres;
-                
-                document.getElementById("sl-water").value = st.levThres;
-                document.getElementById("val-water").textContent = st.levThres;
-            } catch (err) { console.log("Lỗi đồng bộ:", err); }
-        };
+//UTILS
+const clamp = v => Math.max(0, Math.min(MAX, v));
 
-        // --- SETUP ---
-        setupSlider("sl-mois", "val-mois", "/set/mois");
-        setupSlider("sl-water", "val-water", "/set/water");
+const updateGauge = (el, val) => {
+    const offset = CIRC * (1 - clamp(val)/100);
+    el.style.strokeDashoffset = offset;
+};
 
-        document.getElementById("btn-auto").onclick = toggleAuto;
-        document.getElementById("btn-pump").onclick = togglePump;
+const setBtn = (btn, on) => {
+    btn.classList.toggle("on", on);
+    btn.classList.toggle("off", !on);
+};
 
-        fetchDataAndRefreshGauges();
-        syncUI();
-        setInterval(fetchDataAndRefreshGauges, 5000); //udate every 5 seconds
-        setInterval(syncUI, 5000); //sync every 5 seconds
-    </script>
+//API
+const api = async (url) => {
+    try {
+        const res = await fetch(BASE + url);
+        if (!res.ok) throw "HTTP error";
+        return await res.json();
+    } catch(e) {
+        console.log("Lỗi:", e);
+        return null;
+    }
+};
+
+const send = (url) => fetch(BASE + url).catch(()=>{});
+
+//EVENTS
+const setupSlider = (sl, val, url) => {
+    sl.oninput = () => val.textContent = sl.value;
+    sl.onchange = () => send(`${url}?val=${sl.value}`);
+};
+
+const toggleAuto = () => {
+    state.auto ^= 1;
+    if (state.auto) {
+        state.pump = 0;
+        setBtn($("btn-pump"), 0);
+    }
+    setBtn($("btn-auto"), state.auto);
+    send(`/toggle/auto?state=${state.auto}`);
+};
+
+const togglePump = () => {
+    state.pump ^= 1;
+    if (state.pump) {
+        state.auto = 0;
+        setBtn($("btn-auto"), 0);
+    }
+    setBtn($("btn-pump"), state.pump);
+    send(`/toggle/pump?state=${state.pump}`);
+};
+
+//DATA
+const refresh = async () => {
+    const data = await api("/data");
+    if (!data) return;
+
+    $("mois-val").textContent = data.mois;
+    $("water-val").textContent = data.water;
+
+    updateGauge($("mois-fill"), data.mois);
+    updateGauge($("water-fill"), data.water);
+};
+
+const sync = async () => {
+    const st = await api("/state");
+    if (!st) return;
+
+    state = st;
+
+    setBtn($("btn-auto"), st.auto);
+    setBtn($("btn-pump"), st.pump);
+
+    $("sl-mois").value = st.moisThres;
+    $("val-mois").textContent = st.moisThres;
+
+    $("sl-water").value = st.levThres;
+    $("val-water").textContent = st.levThres;
+};
+
+const init = () => {
+    setupSlider($("sl-mois"), $("val-mois"), "/set/mois");
+    setupSlider($("sl-water"), $("val-water"), "/set/water");
+
+    $("btn-auto").onclick = toggleAuto;
+    $("btn-pump").onclick = togglePump;
+
+    refresh();
+    sync();
+
+    setInterval(() => {
+        refresh();
+        sync();
+    }, INTERVAL);
+};
+
+init();
+</script>
+
 </body>
 </html>

@@ -7,223 +7,184 @@
 #include <BlynkSimpleEsp32.h>
 #include <ESPmDNS.h>
 
-char ssid[] = "PhamQuangTrung";
-char pass[] = "h4ymwyx6";
+#define ADC_MAX 4095
 
-int soilSen = 35;
-int waterSen = 34;
-int pumpPin = 25;
+const char* SSID = "PhamQuangTrung";
+const char* PASS = "h4ymwyx6";
 
+//PIN
+const int PIN_SOIL  = 35;
+const int PIN_WATER = 34;
+const int PIN_PUMP  = 25;
+
+//STATE
+int soilRaw = 0;
+int waterRaw = 0;
 int moiThreshold = 2000;
 int levThreshold = 2000;
+bool autoMode = true;
+bool pumpManual = false;
 
-bool manualPumpState = false;
-bool autoModeEnabled = true;
-
-BlynkTimer timer;
+//SYSTEM
 WebServer server(80);
+BlynkTimer timer;
 
-// ---------------------- SEND TO BLYNK ---------------------
-
-void sendMoisture() {
-  float raw = analogRead(soilSen);
-  int pct = 100 - (raw / 4095.0 * 100);
-  Blynk.virtualWrite(V0, pct);
+int clamp(int v, int minV, int maxV) {
+  if (v < minV) return minV;
+  if (v > maxV) return maxV;
+  return v;
 }
 
-void sendLevel() {
-  float raw = analogRead(waterSen);
-  int pct = (raw / 4095.0 * 100);
-  Blynk.virtualWrite(V1, pct);
+int rawToMoisturePct(int raw) {
+  return 100 - (raw * 100 / ADC_MAX);
 }
 
-
-BLYNK_WRITE(V2) {
-  float p = param.asFloat();
-  moiThreshold = 4095 - (p / 100.0 * 4095);
-
-  Serial.print("[BLYNK] New Moisture Threshold RAW = ");
-  Serial.println(moiThreshold);
+int rawToWaterPct(int raw) {
+  return raw * 100 / ADC_MAX;
 }
 
-BLYNK_WRITE(V3) {
-  float p = param.asFloat();
-  levThreshold = (p / 100.0 * 4095);
-
-  Serial.print("[BLYNK] New Water Threshold RAW = ");
-  Serial.println(levThreshold);
+int pctToRawMoisture(int pct) {
+  return ADC_MAX - (pct * ADC_MAX / 100);
 }
 
-BLYNK_WRITE(V4) {
-  autoModeEnabled = param.asInt();
-  Serial.print("[BLYNK] Auto Mode = ");
-  Serial.println(autoModeEnabled);
+int pctToRawWater(int pct) {
+  return pct * ADC_MAX / 100;
 }
 
-BLYNK_WRITE(V5) {
-  if (!autoModeEnabled) {
-    manualPumpState = param.asInt();
-    digitalWrite(pumpPin, manualPumpState);
-    Serial.print("[BLYNK] Manual Pump = ");
-    Serial.println(manualPumpState);
+//SENSOR
+void readSensors() {
+  soilRaw = analogRead(PIN_SOIL);
+  waterRaw = analogRead(PIN_WATER);
+}
+
+//CONTROL
+void updatePump() {
+  if (autoMode) {
+    bool dry = (soilRaw >= moiThreshold);
+    bool enough = (waterRaw >= levThreshold);
+    digitalWrite(PIN_PUMP, (dry && enough));
   } else {
-    manualPumpState = false;
-    Blynk.virtualWrite(V5, 0);
+    digitalWrite(PIN_PUMP, pumpManual);
   }
 }
 
-// ---------------------- HTTP API ---------------------
+//BLYNK
+void sendToBlynk() {
+  Blynk.virtualWrite(V0, rawToMoisturePct(soilRaw));
+  Blynk.virtualWrite(V1, rawToWaterPct(waterRaw));
+}
 
-void apiData() {
+BLYNK_WRITE(V2) {
+  int pct = clamp(param.asInt(), 0, 100);
+  moiThreshold = pctToRawMoisture(pct);
+}
+
+BLYNK_WRITE(V3) {
+  int pct = clamp(param.asInt(), 0, 100);
+  levThreshold = pctToRawWater(pct);
+}
+
+BLYNK_WRITE(V4) {
+  autoMode = param.asInt();
+}
+
+BLYNK_WRITE(V5) {
+  if (!autoMode) {
+    pumpManual = param.asInt();
+  }
+}
+
+//HTTP
+void sendJSON(String json) {
   server.sendHeader("Access-Control-Allow-Origin", "*");
-
-  int soil = analogRead(soilSen);
-  int water = analogRead(waterSen);
-  int moisPct = 100 - (soil / 4095.0 * 100);
-  int waterPct = (water / 4095.0 * 100);
-
-  String json = "{";
-  json += "\"mois\":" + String(moisPct) + ",";
-  json += "\"water\":" + String(waterPct);
-  json += "}";
-
   server.send(200, "application/json", json);
 }
 
-void apiSetMoisture() {
-  server.sendHeader("Access-Control-Allow-Origin", "*");
+void apiData() {
+  String json = "{";
+  json += "\"mois\":" + String(rawToMoisturePct(soilRaw)) + ",";
+  json += "\"water\":" + String(rawToWaterPct(waterRaw));
+  json += "}";
+  sendJSON(json);
+}
 
-  if (!server.hasArg("val")) 
-    return server.send(400, "text/plain", "val missing");
+void apiState() {
+  String json = "{";
+  json += "\"auto\":" + String(autoMode) + ",";
+  json += "\"pump\":" + String(pumpManual) + ",";
+  json += "\"moisThres\":" + String(rawToMoisturePct(moiThreshold)) + ",";
+  json += "\"levThres\":" + String(rawToWaterPct(levThreshold));
+  json += "}";
+  sendJSON(json);
+}
 
-  int pct = server.arg("val").toInt();
-  moiThreshold = 4095 - (pct / 100.0 * 4095);
+void apiSetMois() {
+  if (!server.hasArg("val")) return server.send(400, "text/plain", "missing");
+
+  int pct = clamp(server.arg("val").toInt(), 0, 100);
+  moiThreshold = pctToRawMoisture(pct);
 
   Blynk.virtualWrite(V2, pct);
-  Serial.print("[API] New Moisture Threshold RAW = ");
-  Serial.println(moiThreshold);
-
   server.send(200, "text/plain", "OK");
 }
 
 void apiSetWater() {
-  server.sendHeader("Access-Control-Allow-Origin", "*");
+  if (!server.hasArg("val")) return server.send(400, "text/plain", "missing");
 
-  if (!server.hasArg("val")) 
-    return server.send(400, "text/plain", "val missing");
-
-  int pct = server.arg("val").toInt();
-  levThreshold = (pct / 100.0 * 4095);
+  int pct = clamp(server.arg("val").toInt(), 0, 100);
+  levThreshold = pctToRawWater(pct);
 
   Blynk.virtualWrite(V3, pct);
-  Serial.print("[API] New Water Threshold RAW = ");
-  Serial.println(levThreshold);
-
   server.send(200, "text/plain", "OK");
 }
 
-void apiToggleAuto() {
-  server.sendHeader("Access-Control-Allow-Origin", "*");
-
-  int s = server.arg("state").toInt();
-  autoModeEnabled = s;
-
-  Blynk.virtualWrite(V4, s);
-
-  Serial.print("[API] Auto Mode = ");
-  Serial.println(autoModeEnabled);
-
+void apiAuto() {
+  autoMode = server.arg("state").toInt();
+  Blynk.virtualWrite(V4, autoMode);
   server.send(200, "text/plain", "OK");
 }
 
-void apiTogglePump() {
-  server.sendHeader("Access-Control-Allow-Origin", "*");
-
-  int s = server.arg("state").toInt();
-  if (!autoModeEnabled) {
-    manualPumpState = s;
-    digitalWrite(pumpPin, s);
-    Blynk.virtualWrite(V5, s);
-
-    Serial.print("[API] Manual Pump = ");
-    Serial.println(manualPumpState);
+void apiPump() {
+  if (!autoMode) {
+    pumpManual = server.arg("state").toInt();
+    Blynk.virtualWrite(V5, pumpManual);
   }
   server.send(200, "text/plain", "OK");
 }
 
-void apiState() {
-  server.sendHeader("Access-Control-Allow-Origin", "*");
-  int moisThresPct = 0;
-  if (moiThreshold > 0) {
-      moisThresPct = 100 - (int)(moiThreshold / 4095.0 * 100);
-  }
-
-  int levThresPct = (int)(levThreshold / 4095.0 * 100);
-
-  String json = "{";
-  json += "\"auto\":" + String(autoModeEnabled) + ",";
-  json += "\"pump\":" + String(manualPumpState) + ","; 
-  json += "\"moisThres\":" + String(moisThresPct) + ","; 
-  json += "\"levThres\":" + String(levThresPct);
-  json += "}";
-
-  server.send(200, "application/json", json);
+//DEBUG
+void debug() {
+  Serial.printf("Soil=%d (%d%%) | Water=%d (%d%%) | Auto=%d | Pump=%d\n",
+    soilRaw, rawToMoisturePct(soilRaw),
+    waterRaw, rawToWaterPct(waterRaw),
+    autoMode, digitalRead(PIN_PUMP)
+  );
 }
 
-unsigned long lastDebug = 0;
-
-void debugPrint() {
-  int soil = analogRead(soilSen);
-  int water = analogRead(waterSen);
-
-  int moisPct = 100 - (soil / 4095.0 * 100);
-  int waterPct = (water / 4095.0 * 100);
-
-  Serial.print("Soil RAW="); Serial.print(soil);
-  Serial.print(" | Moisture%="); Serial.print(moisPct);
-  Serial.print(" | MoiThrRAW="); Serial.print(moiThreshold);
-
-  Serial.print(" || Water RAW="); Serial.print(water);
-  Serial.print(" | Water%="); Serial.print(waterPct);
-  Serial.print(" | WatThrRAW="); Serial.print(levThreshold);
-
-  Serial.print(" || AutoMode="); Serial.print(autoModeEnabled);
-  Serial.print(" | ManualPump="); Serial.print(manualPumpState);
-  Serial.print(" | PumpPin="); Serial.println(digitalRead(pumpPin));
-}
 
 void setup() {
   Serial.begin(115200);
 
-  pinMode(soilSen, INPUT);
-  pinMode(waterSen, INPUT);
-  pinMode(pumpPin, OUTPUT);
-  digitalWrite(pumpPin, LOW);
+  pinMode(PIN_PUMP, OUTPUT);
 
-  WiFi.begin(ssid, pass);
-  while (WiFi.status() != WL_CONNECTED) { delay(200); }
+  WiFi.begin(SSID, PASS);
+  while (WiFi.status() != WL_CONNECTED) delay(200);
 
-  Serial.print("[SYSTEM] IP: ");
   Serial.println(WiFi.localIP());
 
-  if (MDNS.begin("vuonthongminh")) {
-    Serial.println("MDNS responder started");
-  }
+  MDNS.begin("vuonthongminh");
 
-  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
+  Blynk.begin(BLYNK_AUTH_TOKEN, SSID, PASS);
 
-  timer.setInterval(1000L, sendMoisture);
-  timer.setInterval(1000L, sendLevel);
+  timer.setInterval(1000L, sendToBlynk);
 
-  server.on("/state", apiState);
   server.on("/data", apiData);
-  server.on("/set/mois", apiSetMoisture);
+  server.on("/state", apiState);
+  server.on("/set/mois", apiSetMois);
   server.on("/set/water", apiSetWater);
-  server.on("/toggle/auto", apiToggleAuto);
-  server.on("/toggle/pump", apiTogglePump);
+  server.on("/toggle/auto", apiAuto);
+  server.on("/toggle/pump", apiPump);
   server.begin();
-
-  Serial.println("[SYSTEM] Setup completed.");
 }
 
 void loop() {
@@ -231,21 +192,12 @@ void loop() {
   timer.run();
   server.handleClient();
 
-  int soil = analogRead(soilSen);
-  int water = analogRead(waterSen);
+  readSensors();
+  updatePump();
 
-  if (autoModeEnabled == 1) {
-    bool dry = (soil >= moiThreshold);
-    bool enough = (water >= levThreshold);
-    digitalWrite(pumpPin, (dry && enough) ? HIGH : LOW);
-  } 
-  else {
-    digitalWrite(pumpPin, manualPumpState ? HIGH : LOW);
-  }
-
-  unsigned long now = millis();
-  if (now - lastDebug >= 500) {
-    lastDebug = now;
-    debugPrint();
+  static unsigned long last = 0;
+  if (millis() - last > 1000) {
+    last = millis();
+    debug();
   }
 }
